@@ -12,6 +12,7 @@ export async function openaiTTS(
     const res = await fetch(`${config("openai_tts_url")}/v1/audio/speech`, {
       method: "POST",
       body: JSON.stringify({
+        backend: "piper",
         model: config("openai_tts_model"),
         input: message,
         voice: config("openai_tts_voice"),
