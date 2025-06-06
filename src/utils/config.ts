@@ -1,4 +1,6 @@
-const defaults = {
+import { handleConfig, serverConfig } from "@/features/externalAPI/externalAPI";
+
+export const defaults = {
   // AllTalk TTS specific settings
   localXTTS_url: process.env.NEXT_PUBLIC_LOCALXTTS_URL ?? 'http://127.0.0.1:7851',
   alltalk_version: process.env.NEXT_PUBLIC_ALLTALK_VERSION ?? 'v2',
@@ -11,9 +13,13 @@ const defaults = {
   wake_word: 'Hello',
   time_before_idle_sec: '20',
   debug_gfx: 'false',
-  language: 'en',
-  show_introduction: 'true',
-  show_add_to_homescreen: 'true',
+  use_webgpu: 'false',
+  mtoon_debug_mode: 'none',
+  mtoon_material_type: 'mtoon',
+  language: process.env.NEXT_PUBLIC_LANGUAGE ?? 'en',
+  show_introduction: process.env.NEXT_PUBLIC_SHOW_INTRODUCTION ?? 'true',
+  show_arbius_introduction: process.env.NEXT_PUBLIC_SHOW_ARBIUS_INTRODUCTION ?? 'false',
+  show_add_to_homescreen: process.env.NEXT_PUBLIC_SHOW_ADD_TO_HOMESCREEN ?? 'true',
   bg_color: process.env.NEXT_PUBLIC_BG_COLOR ?? '',
   bg_url: process.env.NEXT_PUBLIC_BG_URL ?? '/bg/bg-room2.jpg',
   vrm_url: process.env.NEXT_PUBLIC_VRM_HASH ?? '/vrm/AvatarSample_A.vrm',
@@ -21,8 +27,10 @@ const defaults = {
   vrm_save_type: 'web',
   youtube_videoid: '',
   animation_url: process.env.NEXT_PUBLIC_ANIMATION_URL ?? '/animations/idle_loop.vrma',
+  animation_procedural: process.env.NEXT_PUBLIC_ANIMATION_PROCEDURAL ?? 'false',
   voice_url: process.env.NEXT_PUBLIC_VOICE_URL ?? '',
   chatbot_backend: process.env.NEXT_PUBLIC_CHATBOT_BACKEND ?? 'openai',
+  arbius_llm_model_id: process.env.NEXT_PUBLIC_ARBIUS_LLM_MODEL_ID ?? 'default',
   openai_apikey: process.env.NEXT_PUBLIC_OPENAI_APIKEY ?? 'default',
   openai_url: process.env.NEXT_PUBLIC_OPENAI_URL ?? 'https://i-love-amica.com',
   openai_model: process.env.NEXT_PUBLIC_OPENAI_MODEL ?? 'mlabonne/NeuralDaredevil-8B-abliterated',
@@ -33,14 +41,18 @@ const defaults = {
   koboldai_url: process.env.NEXT_PUBLIC_KOBOLDAI_URL ?? 'http://localhost:5001',
   koboldai_use_extra: process.env.NEXT_PUBLIC_KOBOLDAI_USE_EXTRA ?? 'false',
   koboldai_stop_sequence: process.env.NEXT_PUBLIC_KOBOLDAI_STOP_SEQUENCE ?? '(End)||[END]||Note||***||You:||User:||</s>',
+  moshi_url: process.env.NEXT_PUBLIC_MOSHI_URL ?? 'https://runpod.proxy.net',
   openrouter_apikey: process.env.NEXT_PUBLIC_OPENROUTER_APIKEY ?? '',
   openrouter_url: process.env.NEXT_PUBLIC_OPENROUTER_URL ?? 'https://openrouter.ai/api/v1',
   openrouter_model: process.env.NEXT_PUBLIC_OPENROUTER_MODEL ?? 'openai/gpt-3.5-turbo',
   tts_muted: 'false',
   tts_backend: process.env.NEXT_PUBLIC_TTS_BACKEND ?? 'piper',
   stt_backend: process.env.NEXT_PUBLIC_STT_BACKEND ?? 'whisper_browser',
-  vision_backend: process.env.NEXT_PUBLIC_VISION_BACKEND ?? 'none',
-  vision_system_prompt: process.env.NEXT_PUBLIC_VISION_SYSTEM_PROMPT ?? `You are a friendly human named Amica. Describe the image in detail. Let's start the conversation.`,
+  vision_backend: process.env.NEXT_PUBLIC_VISION_BACKEND ?? 'vision_openai',
+  vision_system_prompt: process.env.NEXT_PUBLIC_VISION_SYSTEM_PROMPT ?? `Look at the image as you would if you are a human, be concise, witty and charming.`,
+  vision_openai_apikey: process.env.NEXT_PUBLIC_VISION_OPENAI_APIKEY ?? 'default',
+  vision_openai_url: process.env.NEXT_PUBLIC_VISION_OPENAI_URL ?? 'https://api-01.heyamica.com',
+  vision_openai_model: process.env.NEXT_PUBLIC_VISION_OPENAI_URL ?? 'gpt-4-vision-preview',
   vision_llamacpp_url: process.env.NEXT_PUBLIC_VISION_LLAMACPP_URL ?? 'http://127.0.0.1:8081',
   vision_ollama_url: process.env.NEXT_PUBLIC_VISION_OLLAMA_URL ?? 'http://localhost:11434',
   vision_ollama_model: process.env.NEXT_PUBLIC_VISION_OLLAMA_MODEL ?? 'llava',
@@ -65,6 +77,8 @@ const defaults = {
   rvc_protect: process.env.NEXT_PUBLIC_RVC_PROTECT ?? '0.33',
   coquiLocal_url: process.env.NEXT_PUBLIC_COQUILOCAL_URL ?? 'http://localhost:5002',
   coquiLocal_voiceid: process.env.NEXT_PUBLIC_COQUILOCAL_VOICEID ?? 'p240',
+  kokoro_url: process.env.NEXT_PUBLIC_KOKORO_URL ?? 'http://localhost:8080',
+  kokoro_voice: process.env.NEXT_PUBLIC_KOKORO_VOICE ?? 'af_bella',
   piper_url: process.env.NEXT_PUBLIC_PIPER_URL ?? 'https://i-love-amica.com:5000/tts',
   elevenlabs_apikey: process.env.NEXT_PUBLIC_ELEVENLABS_APIKEY ??'',
   elevenlabs_voiceid: process.env.NEXT_PUBLIC_ELEVENLABS_VOICEID ?? '21m00Tcm4TlvDq8ikWAM',
@@ -73,6 +87,15 @@ const defaults = {
   coqui_apikey: process.env.NEXT_PUBLIC_COQUI_APIKEY ?? "",
   coqui_voice_id: process.env.NEXT_PUBLIC_COQUI_VOICEID ?? "71c6c3eb-98ca-4a05-8d6b-f8c2b5f9f3a3",
   amica_life_enabled: process.env.NEXT_PUBLIC_AMICA_LIFE_ENABLED ?? 'true',
+  reasoning_engine_enabled: process.env.NEXT_PUBLIC_REASONING_ENGINE_ENABLED ?? 'false',
+  reasoning_engine_url: process.env.NEXT_PUBLIC_REASONING_ENGINE_URL ?? 'https://i-love-amica.com:3000/reasoning/v1/chat/completions',
+  external_api_enabled: process.env.NEXT_PUBLIC_EXTERNAL_API_ENABLED ?? 'false',
+  x_api_key: process.env.NEXT_PUBLIC_X_API_KEY ?? '',
+  x_api_secret: process.env.NEXT_PUBLIC_X_API_SECRET ?? '',
+  x_access_token: process.env.NEXT_PUBLIC_X_ACCESS_TOKEN ?? '',
+  x_access_secret: process.env.NEXT_PUBLIC_X_ACCESS_SECRET ?? '',
+  x_bearer_token: process.env.NEXT_PUBLIC_X_BEARER_TOKEN ?? '',
+  telegram_bot_token: process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN ?? '',
   min_time_interval_sec: '10',
   max_time_interval_sec: '20',
   time_to_sleep_sec: '90',
@@ -98,13 +121,29 @@ Here are some examples to guide your responses:
 Remember, each message you provide should be coherent and reflect the complexity of your thoughts combined with your emotional unpredictability. Let’s engage in a conversation that's as intellectually stimulating as it is emotionally dynamic!`,
 };
 
-function prefixed(key: string) {
+export function prefixed(key: string) {
   return `chatvrm_${key}`;
 }
 
+// Ensure syncLocalStorage runs only on the server side and once
+if (typeof window !== "undefined") {
+  (async () => {
+    await handleConfig("init");
+  })();
+} else {
+  (async () => {
+    await handleConfig("fetch");
+  })();
+}
+
 export function config(key: string): string {
-  if (localStorage.hasOwnProperty(prefixed(key))) {
-    return (<any>localStorage).getItem(prefixed(key));
+  if (typeof localStorage !== "undefined" && localStorage.hasOwnProperty(prefixed(key))) {
+    return (<any>localStorage).getItem(prefixed(key))!;
+  }
+
+  // Fallback to serverConfig if localStorage is unavailable or missing
+  if (serverConfig && serverConfig.hasOwnProperty(key)) {
+    return serverConfig[key];
   }
 
   if (defaults.hasOwnProperty(key)) {
@@ -114,13 +153,21 @@ export function config(key: string): string {
   throw new Error(`config key not found: ${key}`);
 }
 
-export function updateConfig(key: string, value: string) {
-  if (defaults.hasOwnProperty(key)) {
-    localStorage.setItem(prefixed(key), value);
-    return;
-  }
+export async function updateConfig(key: string, value: string) {
+  try {
+    const localKey = prefixed(key);
 
-  throw new Error(`config key not found: ${key}`);
+    // Update localStorage if available
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(localKey, value);
+    }
+
+    // Sync update to server config
+    await handleConfig("update",{ key, value });
+
+  } catch (e) {
+    console.error(`Error updating config for key "${key}": ${e}`);
+  }
 }
 
 export function defaultConfig(key: string): string {
@@ -131,8 +178,8 @@ export function defaultConfig(key: string): string {
   throw new Error(`config key not found: ${key}`);
 }
 
-export function resetConfig() {
-  Object.entries(defaults).forEach(([key, value]) => {
-    updateConfig(key, value);
-  });
+export async function resetConfig() {
+  for (const [key, value] of Object.entries(defaults)) {
+    await updateConfig(key, value);
+  }
 }

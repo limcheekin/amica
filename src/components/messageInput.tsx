@@ -6,6 +6,7 @@ import { useMicVAD } from "@ricky0123/vad-react"
 import { IconButton } from "./iconButton";
 import { useTranscriber } from "@/hooks/useTranscriber";
 import { cleanTranscript, cleanFromPunctuation, cleanFromWakeWord } from "@/utils/stringProcessing";
+import { hasOnScreenKeyboard } from "@/utils/hasOnScreenKeyboard";
 import { AlertContext } from "@/features/alert/alertContext";
 import { ChatContext } from "@/features/chat/chatContext";
 import { openaiWhisper  } from "@/features/openaiWhisper/openaiWhisper";
@@ -13,6 +14,8 @@ import { whispercpp  } from "@/features/whispercpp/whispercpp";
 import { config } from "@/utils/config";
 import { WaveFile } from "wavefile";
 import { AmicaLifeContext } from "@/features/amicaLife/amicaLifeContext";
+import { AudioControlsContext } from "@/features/moshi/components/audioControlsContext";
+
 
 export default function MessageInput({
   userMessage,
@@ -34,6 +37,8 @@ export default function MessageInput({
   const { chat: bot } = useContext(ChatContext);
   const { alert } = useContext(AlertContext);
   const { amicaLife } = useContext(AmicaLifeContext);
+  const { audioControls: moshi } = useContext(AudioControlsContext);
+  const [ moshiMuted, setMoshiMuted] = useState(moshi.isMuted());
 
   const vad = useMicVAD({
     startOnLoad: false,
@@ -197,7 +202,9 @@ export default function MessageInput({
     bot.receiveMessageFromUser(userMessage,false);
     // only if we are using non-VAD mode should we focus on the input
     if (! vad.listening) {
-      inputRef.current?.focus();
+      if (! hasOnScreenKeyboard()) {
+        inputRef.current?.focus();
+      }
     }
     setUserMessage("");
   }
@@ -206,23 +213,42 @@ export default function MessageInput({
     <div className="fixed bottom-2 z-20 w-full">
       <div className="mx-auto max-w-4xl p-2 backdrop-blur-lg border-0 rounded-lg">
         <div className="grid grid-flow-col grid-cols-[min-content_1fr_min-content] gap-[8px]">
-          <div className='flex flex-col justify-center items-center'>
-            <IconButton
-              iconName={vad.listening ? "24/PauseAlt" : "24/Microphone"}
-              className="bg-secondary hover:bg-secondary-hover active:bg-secondary-press disabled:bg-secondary-disabled"
-              isProcessing={vad.userSpeaking}
-              disabled={config('stt_backend') === 'none' || vad.loading || Boolean(vad.errored)}
-              onClick={vad.toggle}
-            />
+          <div>
+            <div className='flex flex-col justify-center items-center'>
+              {config("chatbot_backend") === "moshi" ? (
+                <IconButton
+                iconName={!moshiMuted ? "24/PauseAlt" : "24/Microphone"}
+                className="bg-secondary hover:bg-secondary-hover active:bg-secondary-press disabled:bg-secondary-disabled"
+                isProcessing={moshiMuted && moshi.getRecorder() != null}
+                disabled={!moshi.getRecorder()}
+                onClick={() => {
+                  moshi.toggleMute();
+                  setMoshiMuted(!moshiMuted);
+                }}
+              />
+              ) : (
+                <IconButton
+                iconName={vad.listening ? "24/PauseAlt" : "24/Microphone"}
+                className="bg-secondary hover:bg-secondary-hover active:bg-secondary-press disabled:bg-secondary-disabled"
+                isProcessing={vad.userSpeaking}
+                disabled={config('stt_backend') === 'none' || vad.loading || Boolean(vad.errored)}
+                onClick={vad.toggle}
+              />
+              )}
+            </div>
           </div>
 
           <input
             type="text"
             ref={inputRef}
-            placeholder="Write message here..."
+            placeholder={config("chatbot_backend") === "moshi" ? "Disabled in moshi chatbot" : "Write message here..."}
             onChange={handleInputChange}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
+                if (hasOnScreenKeyboard()) {
+                  inputRef.current?.blur();
+                }
+
                 if (userMessage === "") {
                   return false;
                 }
@@ -230,17 +256,19 @@ export default function MessageInput({
                 clickedSendButton();
               }
             }}
-            disabled={false}
+            disabled={config("chatbot_backend") === "moshi"}
 
             className="disabled block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-1 focus:ring-inset focus:ring-gray-400 sm:text-sm sm:leading-6"
-            value={userMessage}></input>
+            value={userMessage}
+            autoComplete="off"
+          />
 
           <div className='flex flex-col justify-center items-center'>
             <IconButton
               iconName="24/Send"
               className="ml-2 bg-secondary hover:bg-secondary-hover active:bg-secondary-press disabled:bg-secondary-disabled"
               isProcessing={isChatProcessing || transcriber.isBusy}
-              disabled={isChatProcessing || !userMessage || transcriber.isModelLoading}
+              disabled={isChatProcessing || !userMessage || transcriber.isModelLoading || config("chatbot_backend") === "moshi"}
               onClick={clickedSendButton}
             />
           </div>
